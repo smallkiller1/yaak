@@ -22,7 +22,7 @@ export function SegmentedControl<T extends string>({ value, onChange, options, n
       role="group"
       dir="ltr"
       space={0.5}
-      className="bg-surface-highlight rounded-md mb-auto opacity-0 group-focus-within/markdown:opacity-100 group-hover/markdown:opacity-100 transition-opacity transform-gpu"
+      className="bg-surface-highlight rounded-md mb-auto opacity-0 group-focus-within/markdown:opacity-100 group-hover/markdown:opacity-100 transition-opacity transform-cpu"
       onKeyDown={(e) => {
         const selectedIndex = options.findIndex((o) => o.value === selectedValue);
         if (e.key === 'ArrowRight') {

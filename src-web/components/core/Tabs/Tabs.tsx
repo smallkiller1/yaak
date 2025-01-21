@@ -67,7 +67,7 @@ export function Tabs({
       ref={ref}
       className={classNames(
         className,
-        'transform-gpu',
+        'transform-cpu',
         'h-full grid grid-rows-[auto_minmax(0,1fr)] grid-cols-1',
       )}
     >

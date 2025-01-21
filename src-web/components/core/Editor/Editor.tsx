@@ -429,7 +429,7 @@ export const Editor = forwardRef<EditorView | undefined, EditorProps>(function E
   const decoratedActions = useMemo(() => {
     const results = [];
     const actionClassName = classNames(
-      'bg-surface transition-opacity transform-gpu opacity-0 group-hover:opacity-100 hover:!opacity-100 shadow',
+      'bg-surface transition-opacity transform-cpu opacity-0 group-hover:opacity-100 hover:!opacity-100 shadow',
     );
 
     if (format) {
