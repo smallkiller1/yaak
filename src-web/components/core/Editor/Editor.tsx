@@ -1,5 +1,5 @@
-import { defaultKeymap, historyField } from '@codemirror/commands';
-import { foldState, forceParsing } from '@codemirror/language';
+import { defaultKeymap } from '@codemirror/commands';
+import { forceParsing } from '@codemirror/language';
 import type { EditorStateConfig, Extension } from '@codemirror/state';
 import { Compartment, EditorState } from '@codemirror/state';
 import { keymap, placeholder as placeholderExt, tooltips } from '@codemirror/view';
@@ -10,7 +10,6 @@ import type { EditorKeymap, EnvironmentVariable } from '@yaakapp-internal/models
 import type { EditorLanguage, TemplateFunction } from '@yaakapp-internal/plugins';
 import classNames from 'classnames';
 import { EditorView } from 'codemirror';
-import { md5 } from 'js-md5';
 import type { MutableRefObject, ReactNode } from 'react';
 import {
   Children,
@@ -77,7 +76,7 @@ export interface EditorProps {
   stateKey: string | null;
 }
 
-const stateFields = { history: historyField, folds: foldState };
+// const stateFields = { history: historyField, folds: foldState };
 
 const emptyVariables: EnvironmentVariable[] = [];
 const emptyExtension: Extension = [];
@@ -364,14 +363,15 @@ export const Editor = forwardRef<EditorView | undefined, EditorProps>(function E
           ...(extraExtensions ?? []),
         ];
 
-        const cachedJsonState = getCachedEditorState(defaultValue ?? '', stateKey);
+        // const cachedJsonState = getCachedEditorState(defaultValue ?? '', stateKey);
 
         const doc = `${defaultValue ?? ''}`;
         const config: EditorStateConfig = { extensions, doc };
 
-        const state = cachedJsonState
-          ? EditorState.fromJSON(cachedJsonState, config, stateFields)
-          : EditorState.create(config);
+        // const state = cachedJsonState
+        //   ? EditorState.fromJSON(cachedJsonState, config, stateFields)
+        //   : EditorState.create(config);
+        const state = EditorState.create(config);
 
         const view = new EditorView({ state, parent: container });
 
@@ -507,7 +507,6 @@ export const Editor = forwardRef<EditorView | undefined, EditorProps>(function E
 });
 
 function getExtensions({
-  stateKey,
   container,
   readOnly,
   singleLine,
@@ -574,9 +573,10 @@ function getExtensions({
     }),
 
     // Cache editor state
-    EditorView.updateListener.of((update) => {
-      saveCachedEditorState(stateKey, update.state);
-    }),
+    // Disable for now
+    // EditorView.updateListener.of((update) => {
+    //   saveCachedEditorState(stateKey, update.state);
+    // }),
   ];
 }
 
@@ -592,45 +592,47 @@ const placeholderElFromText = (text: string, type: EditorProps['type']) => {
   return el;
 };
 
-function saveCachedEditorState(stateKey: string | null, state: EditorState | null) {
-  if (!stateKey || state == null) return;
-  const stateObj = state.toJSON(stateFields);
-
-  // Save state in sessionStorage by removing doc and saving the hash of it instead
-  // This will be checked on restore and put back in if it matches
-  stateObj.docHash = md5(stateObj.doc);
-  delete stateObj.doc;
-
-  try {
-    sessionStorage.setItem(computeFullStateKey(stateKey), JSON.stringify(stateObj));
-  } catch (err) {
-    console.log('Failed to save to editor state', stateKey, err);
-  }
-}
-
-function getCachedEditorState(doc: string, stateKey: string | null) {
-  if (stateKey == null) return;
-
-  try {
-    const stateStr = sessionStorage.getItem(computeFullStateKey(stateKey));
-    if (stateStr == null) return null;
-
-    const { docHash, ...state } = JSON.parse(stateStr);
-
-    // Ensure the doc matches the one that was used to save the state
-    if (docHash !== md5(doc)) {
-      return null;
-    }
-
-    state.doc = doc;
-    return state;
-  } catch (err) {
-    console.log('Failed to restore editor storage', stateKey, err);
-  }
-
-  return null;
-}
-
-function computeFullStateKey(stateKey: string): string {
-  return `editor.${stateKey}`;
-}
+// function saveCachedEditorState(stateKey: string | null, state: EditorState | null) {
+//   if (!stateKey || state == null) return;
+//   console.log('SAVE CACHED STATE', stateKey);
+//   const stateObj = state.toJSON(stateFields);
+//
+//   // Save state in sessionStorage by removing doc and saving the hash of it instead
+//   // This will be checked on restore and put back in if it matches
+//   stateObj.docHash = md5(stateObj.doc);
+//   delete stateObj.doc;
+//
+//   try {
+//     sessionStorage.setItem(computeFullStateKey(stateKey), JSON.stringify(stateObj));
+//   } catch (err) {
+//     console.log('Failed to save to editor state', stateKey, err);
+//   }
+// }
+//
+// function getCachedEditorState(doc: string, stateKey: string | null) {
+//   if (stateKey == null) return;
+//   console.log('GET CACHED STATE', stateKey);
+//
+//   try {
+//     const stateStr = sessionStorage.getItem(computeFullStateKey(stateKey));
+//     if (stateStr == null) return null;
+//
+//     const { docHash, ...state } = JSON.parse(stateStr);
+//
+//     // Ensure the doc matches the one that was used to save the state
+//     if (docHash !== md5(doc)) {
+//       return null;
+//     }
+//
+//     state.doc = doc;
+//     return state;
+//   } catch (err) {
+//     console.log('Failed to restore editor storage', stateKey, err);
+//   }
+//
+//   return null;
+// }
+//
+// function computeFullStateKey(stateKey: string): string {
+//   return `editor.${stateKey}`;
+// }
