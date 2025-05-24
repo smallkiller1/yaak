@@ -12,6 +12,7 @@ import {
 } from 'react';
 import type { XYCoord } from 'react-dnd';
 import { useDrag, useDrop } from 'react-dnd';
+import { useRandomKey } from '../../hooks/useRandomKey';
 import { useToggle } from '../../hooks/useToggle';
 import { languageFromContentType } from '../../lib/contentType';
 import { showDialog } from '../../lib/dialog';
@@ -107,6 +108,9 @@ export const PairEditor = forwardRef<PairEditorRef, PairEditorProps>(function Pa
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [pairs, setPairs] = useState<PairWithId[]>([]);
   const [showAll, toggleShowAll] = useToggle(false);
+  // NOTE: Use local force update key because we trigger an effect on forceUpdateKey change. If
+  //  we simply pass forceUpdateKey to the editor, the data set by useEffect will be stale.
+  const [localForceUpdateKey, regenerateLocalForceUpdateKey] = useRandomKey();
 
   useImperativeHandle(
     ref,
@@ -136,6 +140,7 @@ export const PairEditor = forwardRef<PairEditorRef, PairEditorProps>(function Pa
     }
 
     setPairs(newPairs);
+    regenerateLocalForceUpdateKey();
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forceUpdateKey]);
@@ -240,7 +245,7 @@ export const PairEditor = forwardRef<PairEditorRef, PairEditorProps>(function Pa
               forcedEnvironmentId={forcedEnvironmentId}
               forceFocusNamePairId={forceFocusNamePairId}
               forceFocusValuePairId={forceFocusValuePairId}
-              forceUpdateKey={forceUpdateKey}
+              forceUpdateKey={localForceUpdateKey}
               index={i}
               isLast={isLast}
               nameAutocomplete={nameAutocomplete}
