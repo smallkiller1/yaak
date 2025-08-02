@@ -7,7 +7,7 @@ import type {
 import { foldersAtom, patchModelById } from '@yaakapp-internal/models';
 import classNames from 'classnames';
 import { atom, useAtomValue } from 'jotai';
-import type { ReactElement } from 'react';
+import type { MouseEvent, ReactElement } from 'react';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { XYCoord } from 'react-dnd';
 import { useDrag, useDrop } from 'react-dnd';
@@ -20,10 +20,10 @@ import { HttpMethodTag } from '../core/HttpMethodTag';
 import { HttpStatusTag } from '../core/HttpStatusTag';
 import { Icon } from '../core/Icon';
 import { LoadingIcon } from '../core/LoadingIcon';
-import type { DragItem} from './dnd';
+import type { DragItem } from './dnd';
 import { ItemTypes } from './dnd';
 import type { SidebarTreeNode } from './Sidebar';
-import { sidebarSelectedIdAtom } from './SidebarAtoms';
+import { sidebarSelectedIdsAtom } from './SidebarAtoms';
 import { SidebarItemContextMenu } from './SidebarItemContextMenu';
 import type { SidebarItemsProps } from './SidebarItems';
 
@@ -103,12 +103,12 @@ export const SidebarItem = memo(function SidebarItem({
   const [editing, setEditing] = useState<boolean>(false);
 
   const [selected, setSelected] = useState<boolean>(
-    jotaiStore.get(sidebarSelectedIdAtom) == itemId,
+    jotaiStore.get(sidebarSelectedIdsAtom).includes(itemId),
   );
   useEffect(() => {
-    return jotaiStore.sub(sidebarSelectedIdAtom, () => {
-      const value = jotaiStore.get(sidebarSelectedIdAtom);
-      setSelected(value === itemId);
+    return jotaiStore.sub(sidebarSelectedIdsAtom, () => {
+      const value = jotaiStore.get(sidebarSelectedIdsAtom);
+      setSelected(value.includes(itemId));
     });
   }, [itemId]);
 
@@ -172,13 +172,16 @@ export const SidebarItem = memo(function SidebarItem({
     [handleSubmitNameEdit],
   );
 
-  const handleSelect = useCallback(async () => {
-    if (itemModel === 'folder') {
-      toggleCollapsed();
-    } else {
-      onSelect(itemId);
-    }
-  }, [itemModel, toggleCollapsed, onSelect, itemId]);
+  const handleSelect = useCallback(
+    async (e: MouseEvent) => {
+      if (itemModel === 'folder') {
+        toggleCollapsed();
+      } else {
+        onSelect(itemId, e);
+      }
+    },
+    [itemModel, toggleCollapsed, onSelect, itemId],
+  );
   const [showContextMenu, setShowContextMenu] = useState<{
     x: number;
     y: number;
@@ -239,7 +242,6 @@ export const SidebarItem = memo(function SidebarItem({
           className={classNames(
             'w-full flex gap-1.5 items-center h-xs px-1.5 rounded-md focus-visible:ring focus-visible:ring-border-focus outline-0',
             editing && 'ring-1 focus-within:ring-focus',
-            'hover:bg-surface-highlight',
             active && 'bg-surface-highlight text-text',
             !active && 'text-text-subtle',
             showContextMenu && '!text-text', // Show as "active" when the context menu is open

@@ -8,6 +8,7 @@ import type {
 import { getAnyModel, patchModelById } from '@yaakapp-internal/models';
 import classNames from 'classnames';
 import { useAtom, useAtomValue } from 'jotai';
+import type { MouseEvent } from 'react';
 import React, { useCallback, useRef, useState } from 'react';
 import { useDrop } from 'react-dnd';
 import { useKey, useKeyPressEvent } from 'react-use';
@@ -25,7 +26,7 @@ import { ContextMenu } from '../core/Dropdown';
 import { GitDropdown } from '../GitDropdown';
 import type { DragItem } from './dnd';
 import { ItemTypes } from './dnd';
-import { sidebarSelectedIdAtom, sidebarTreeAtom } from './SidebarAtoms';
+import { sidebarSelectedIdsAtom, sidebarTreeAtom } from './SidebarAtoms';
 import type { SidebarItemProps } from './SidebarItem';
 import { SidebarItems } from './SidebarItems';
 
@@ -51,7 +52,8 @@ export function Sidebar({ className }: Props) {
   const sidebarRef = useRef<HTMLElement>(null);
   const activeWorkspace = useAtomValue(activeWorkspaceAtom);
   const [hasFocus, setHasFocus] = useState<boolean>(false);
-  const [selectedId, setSelectedId] = useAtom(sidebarSelectedIdAtom);
+  const [selectedIds, setSelectedIds] = useAtom(sidebarSelectedIdsAtom);
+  const [lastSelectedId, setLastSelectedId] = useState<string | null>(null);
   const [selectedTree, setSelectedTree] = useState<SidebarTreeNode | null>(null);
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [hoveredTree, setHoveredTree] = useState<SidebarTreeNode | null>(null);
@@ -59,38 +61,62 @@ export function Sidebar({ className }: Props) {
 
   const { tree, treeParentMap, selectableRequests } = useAtomValue(sidebarTreeAtom);
 
+  const toggleSelectedId = useCallback(
+    (id: string | null, clear: boolean = false) => {
+      setLastSelectedId(id);
+      if (id == null) {
+        setSelectedIds([]);
+      } else if (clear) {
+        setSelectedIds([id]);
+      } else {
+        setSelectedIds((ids) => {
+          const withoutId = ids.filter((v) => v !== id);
+          if (withoutId.length !== ids.length) {
+            return withoutId;
+          } else {
+            console.log('APPENTING ID', id, ids);
+            return [...ids, id];
+          }
+        });
+      }
+    },
+    [setSelectedIds],
+  );
+
   const focusActiveRequest = useCallback(
     (
       args: {
         forced?: {
-          id: string;
+          ids: string[];
           tree: SidebarTreeNode;
         };
         noFocusSidebar?: boolean;
       } = {},
     ) => {
+      console.log("FOCUS ACTIVE REQUEST");
       const activeRequestId = jotaiStore.get(activeRequestIdAtom);
       const { forced, noFocusSidebar } = args;
       const tree = forced?.tree ?? treeParentMap[activeRequestId ?? 'n/a'] ?? null;
       const children = tree?.children ?? [];
-      const id = forced?.id ?? children.find((m) => m.id === activeRequestId)?.id ?? null;
+      const ids = forced?.ids ?? children.filter((m) => m.id === activeRequestId).map((m) => m.id);
 
       setHasFocus(true);
-      setSelectedId(id);
-      setSelectedTree(tree);
+      // setSelectedIds(ids);
+      // setSelectedTree(tree);
 
-      if (id == null) {
+      if (ids.length === 0) {
         return;
       }
       if (!noFocusSidebar) {
         sidebarRef.current?.focus();
       }
     },
-    [setHasFocus, setSelectedId, treeParentMap],
+    [treeParentMap],
   );
 
   const handleSelect = useCallback(
-    async (id: string) => {
+    async (id: string, e: MouseEvent | null) => {
+      console.log("SELECT", e?.button);
       const tree = treeParentMap[id ?? 'n/a'] ?? null;
       const children = tree?.children ?? [];
       const node = children.find((m) => m.id === id) ?? null;
@@ -108,17 +134,37 @@ export function Sidebar({ className }: Props) {
         });
 
         setHasFocus(true);
-        setSelectedId(id);
+        if (e?.shiftKey) {
+          const lastSelectedIndex =
+            selectableRequests.findIndex((r) => r.id === lastSelectedId) ?? null;
+          const currIndex = selectableRequests.findIndex((r) => r.id === id) ?? null;
+          if (lastSelectedIndex === -1) {
+            setSelectedIds([id]);
+            setLastSelectedId(id);
+          } else if (currIndex < lastSelectedIndex) {
+            setSelectedIds(
+              selectableRequests.slice(currIndex, lastSelectedIndex + 1).map((r) => r.id),
+            );
+            // NOTE: Don't update lastSelectedId when holding shift
+          } else {
+            setSelectedIds(
+              selectableRequests.slice(lastSelectedIndex, currIndex + 1).map((r) => r.id),
+            );
+            // NOTE: Don't update lastSelectedId when holding shift
+          }
+        } else {
+          toggleSelectedId(id, e == null || !e.metaKey);
+        }
         setSelectedTree(tree);
       }
     },
-    [treeParentMap, setSelectedId],
+    [treeParentMap, selectableRequests, lastSelectedId, setSelectedIds, toggleSelectedId],
   );
 
   const handleClearSelected = useCallback(() => {
-    setSelectedId(null);
+    toggleSelectedId(null);
     setSelectedTree(null);
-  }, [setSelectedId]);
+  }, [toggleSelectedId]);
 
   const handleFocus = useCallback(() => {
     if (hasFocus) return;
@@ -130,9 +176,11 @@ export function Sidebar({ className }: Props) {
   useHotKey(
     'sidebar.delete_selected_item',
     async () => {
-      const request = getAnyModel(selectedId ?? 'n/a');
-      if (request != null) {
-        await deleteModelWithConfirm(request);
+      for (const selectedId of selectedIds) {
+        const request = getAnyModel(selectedId ?? 'n/a');
+        if (request != null) {
+          await deleteModelWithConfirm(request);
+        }
       }
     },
     { enable: hasFocus },
@@ -152,14 +200,17 @@ export function Sidebar({ className }: Props) {
 
     // Select 0th index on focus if none selected
     focusActiveRequest(
-      selectedTree != null && selectedId != null
-        ? { forced: { id: selectedId, tree: selectedTree } }
+      selectedTree != null && selectedIds.length > 0
+        ? { forced: { ids: selectedIds, tree: selectedTree } }
         : undefined,
     );
   });
 
   useKeyPressEvent('Enter', async (e) => {
     if (!hasFocus) return;
+    if (selectedIds.length === 0 || selectedIds.length > 1) return;
+
+    const selectedId = selectedIds[0];
     const selected = selectableRequests.find((r) => r.id === selectedId);
     if (!selected || activeWorkspace == null) {
       return;
@@ -174,18 +225,18 @@ export function Sidebar({ className }: Props) {
     (e) => {
       if (!hasFocus) return;
       e.preventDefault();
-      const i = selectableRequests.findIndex((r) => r.id === selectedId);
+      const i = selectableRequests.findLastIndex((r) => selectedIds.includes(r.id));
       const newI = i <= 0 ? selectableRequests.length - 1 : i - 1;
       const newSelectable = selectableRequests[newI];
       if (newSelectable == null) {
         return;
       }
 
-      setSelectedId(newSelectable.id);
+      toggleSelectedId(newSelectable.id, !e.shiftKey);
       setSelectedTree(newSelectable.tree);
     },
     undefined,
-    [hasFocus, selectableRequests, selectedId, setSelectedId, setSelectedTree],
+    [hasFocus, selectableRequests, setSelectedTree],
   );
 
   useKey(
@@ -193,18 +244,22 @@ export function Sidebar({ className }: Props) {
     (e) => {
       if (!hasFocus) return;
       e.preventDefault();
-      const i = selectableRequests.findIndex((r) => r.id === selectedId);
+      const i = selectableRequests.findIndex((r) => selectedIds.includes(r.id));
       const newI = i >= selectableRequests.length - 1 ? 0 : i + 1;
       const newSelectable = selectableRequests[newI];
       if (newSelectable == null) {
         return;
       }
 
-      setSelectedId(newSelectable.id);
+      if (e.shiftKey) {
+        toggleSelectedId(newSelectable.id);
+      } else {
+        toggleSelectedId(newSelectable.id, true);
+      }
       setSelectedTree(newSelectable.tree);
     },
     undefined,
-    [hasFocus, selectableRequests, selectedId, setSelectedId, setSelectedTree],
+    [hasFocus, selectableRequests, setSelectedTree],
   );
 
   const handleMoveToSidebarEnd = useCallback(() => {
@@ -235,9 +290,13 @@ export function Sidebar({ className }: Props) {
     [treeParentMap],
   );
 
-  const handleDragStart = useCallback<SidebarItemProps['onDragStart']>((id: string) => {
-    setDraggingId(id);
-  }, []);
+  const handleDragStart = useCallback<SidebarItemProps['onDragStart']>(
+    async (id: string) => {
+      await handleSelect(id, null);
+      setDraggingId(id);
+    },
+    [handleSelect],
+  );
 
   const handleEnd = useCallback<SidebarItemProps['onEnd']>(
     async (itemId) => {

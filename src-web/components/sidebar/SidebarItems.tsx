@@ -5,6 +5,7 @@ import {
 } from '@yaakapp-internal/models';
 import classNames from 'classnames';
 import { useAtomValue } from 'jotai';
+import type { MouseEvent } from 'react';
 import React, { Fragment, memo } from 'react';
 import { VStack } from '../core/Stacks';
 import { DropMarker } from '../DropMarker';
@@ -21,7 +22,7 @@ export interface SidebarItemsProps {
   handleMove: (id: string, side: 'above' | 'below') => void;
   handleEnd: (id: string) => void;
   handleDragStart: (id: string) => void;
-  onSelect: (requestId: string) => void;
+  onSelect: (requestId: string, e: MouseEvent) => void;
 }
 
 export const SidebarItems = memo(function SidebarItems({

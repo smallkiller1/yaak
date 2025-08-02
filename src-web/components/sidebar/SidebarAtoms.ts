@@ -14,7 +14,7 @@ import { deepEqualAtom } from '../../lib/atoms';
 import { resolvedModelName } from '../../lib/resolvedModelName';
 import type { SidebarTreeNode } from './Sidebar';
 
-export const sidebarSelectedIdAtom = atom<string | null>(null);
+export const sidebarSelectedIdsAtom = atom<string[]>([]);
 
 const allPotentialChildrenAtom = atom((get) => {
   const requests = get(allRequestsAtom);
