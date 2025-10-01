@@ -369,7 +369,7 @@ pub async fn install_update_maybe_download<R: Runtime>(
 
 pub fn ensure_download_path<R: Runtime>(window: &WebviewWindow<R>, update: &Update) -> Result<PathBuf> {
     // Ensure dir exists
-    let base_dir = window.path().app_cache_dir()?.join("yaak-updates");
+    let base_dir = window.path().app_cache_dir()?.join("updates");
     std::fs::create_dir_all(&base_dir)?;
 
     // Generate name based on signature
