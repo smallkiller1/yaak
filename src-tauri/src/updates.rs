@@ -54,6 +54,7 @@ impl UpdateMode {
     }
 }
 
+#[derive(PartialEq)]
 pub enum UpdateTrigger {
     Background,
     User,
@@ -70,6 +71,7 @@ impl YaakUpdater {
         &mut self,
         window: &WebviewWindow<R>,
         mode: UpdateMode,
+        auto_download: bool,
         update_trigger: UpdateTrigger,
     ) -> Result<bool> {
         // Only AppImage supports updates on Linux, so skip if it's not
@@ -84,7 +86,7 @@ impl YaakUpdater {
         let update_key = format!("{:x}", md5::compute(settings.id));
         self.last_update_check = SystemTime::now();
 
-        info!("Checking for updates mode={}", mode);
+        info!("Checking for updates mode={} autodl={}", mode, auto_download);
 
         let w = window.clone();
         let update_check_result = w
@@ -130,7 +132,7 @@ impl YaakUpdater {
                     }
 
                     // If it's a background update, try downloading it first
-                    if let UpdateTrigger::Background = update_trigger {
+                    if update_trigger == UpdateTrigger::Background && auto_download {
                         info!("Downloading update {} in background", update.version);
                         if let Err(e) = download_update_idempotent(&w, &update).await {
                             error!("Failed to download {}: {}", update.version, e);
@@ -166,6 +168,7 @@ impl YaakUpdater {
     pub async fn maybe_check<R: Runtime>(
         &mut self,
         window: &WebviewWindow<R>,
+        auto_download: bool,
         mode: UpdateMode,
     ) -> Result<bool> {
         let update_period_seconds = match mode {
@@ -184,7 +187,7 @@ impl YaakUpdater {
             return Ok(false);
         }
 
-        self.check_now(window, mode, UpdateTrigger::Background).await
+        self.check_now(window, mode, auto_download, UpdateTrigger::Background).await
     }
 }
 
@@ -367,7 +370,10 @@ pub async fn install_update_maybe_download<R: Runtime>(
     Ok(())
 }
 
-pub fn ensure_download_path<R: Runtime>(window: &WebviewWindow<R>, update: &Update) -> Result<PathBuf> {
+pub fn ensure_download_path<R: Runtime>(
+    window: &WebviewWindow<R>,
+    update: &Update,
+) -> Result<PathBuf> {
     // Ensure dir exists
     let base_dir = window.path().app_cache_dir()?.join("updates");
     std::fs::create_dir_all(&base_dir)?;

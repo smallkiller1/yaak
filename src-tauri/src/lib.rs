@@ -689,9 +689,7 @@ async fn cmd_grpc_go<R: Runtime>(
 }
 
 #[tauri::command]
-async fn cmd_restart<R: Runtime>(
-    app_handle: AppHandle<R>,
-) -> YaakResult<()> {
+async fn cmd_restart<R: Runtime>(app_handle: AppHandle<R>) -> YaakResult<()> {
     app_handle.request_restart();
     Ok(())
 }
@@ -1216,7 +1214,12 @@ async fn cmd_check_for_updates<R: Runtime>(
     yaak_updater: State<'_, Mutex<YaakUpdater>>,
 ) -> YaakResult<bool> {
     let update_mode = get_update_mode(&window).await?;
-    Ok(yaak_updater.lock().await.check_now(&window, update_mode, UpdateTrigger::User).await?)
+    let settings = window.db().get_settings();
+    Ok(yaak_updater
+        .lock()
+        .await
+        .check_now(&window, update_mode, settings.auto_download_updates, UpdateTrigger::User)
+        .await?)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1403,11 +1406,16 @@ pub fn run() {
                         let w = app_handle.get_webview_window(&label).unwrap();
                         let h = app_handle.clone();
                         tauri::async_runtime::spawn(async move {
-                            if w.db().get_settings().autoupdate {
+                            let settings = w.db().get_settings();
+                            if settings.autoupdate {
                                 time::sleep(Duration::from_secs(3)).await; // Wait a bit so it's not so jarring
                                 let val: State<'_, Mutex<YaakUpdater>> = h.state();
                                 let update_mode = get_update_mode(&w).await.unwrap();
-                                if let Err(e) = val.lock().await.maybe_check(&w, update_mode).await
+                                if let Err(e) = val
+                                    .lock()
+                                    .await
+                                    .maybe_check(&w, settings.auto_download_updates, update_mode)
+                                    .await
                                 {
                                     warn!("Failed to check for updates {e:?}");
                                 }

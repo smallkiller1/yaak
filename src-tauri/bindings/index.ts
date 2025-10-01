@@ -5,3 +5,7 @@ export type UpdateInfo = { replyEventId: string, version: string, downloaded: bo
 export type UpdateResponse = { "type": "ack" } | { "type": "action", action: UpdateResponseAction, };
 
 export type UpdateResponseAction = "install" | "skip";
+
+export type YaakNotification = { timestamp: string, timeout: number | null, id: string, title: string | null, message: string, color: string | null, action: YaakNotificationAction | null, };
+
+export type YaakNotificationAction = { label: string, url: string, };
